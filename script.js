@@ -50,8 +50,7 @@ const STATE = {
   fullscreenSupported: true,
   timingFallback:  false,
   isPractice:      false,
-  practiceTrials:  [],
-  practiceIndex:   0,
+  practiceSequence: [],      // pre-built practice trial sequence
   blockSequences:  [],       // pre-built sequences per block
 };
 
@@ -223,15 +222,14 @@ function antiStreak(arr, maxStreak) {
   return a;
 }
 
-function buildPracticeSequence() {
-  // 3 face, 2 nonface (approximately 50/50 with 5 trials)
-  const faceStimuli    = STATE.stimuli.filter((s) => s.type === 'face');
-  const nonfaceStimuli = STATE.stimuli.filter((s) => s.type === 'nonface');
-  const seq = [
-    faceStimuli[0], faceStimuli[1], faceStimuli[2],
-    nonfaceStimuli[0], nonfaceStimuli[1],
-  ];
-  return seededShuffle(seq);
+// Practice images are drawn from the global pool before block sequences,
+// so they never repeat in main blocks.
+function buildPracticeSequenceFromPool() {
+  const faceSlice    = STATE.facePool.slice(STATE.facePoolIdx,    STATE.facePoolIdx    + 3);
+  const nonfaceSlice = STATE.nonfacePool.slice(STATE.nonfacePoolIdx, STATE.nonfacePoolIdx + 2);
+  STATE.facePoolIdx    += 3;
+  STATE.nonfacePoolIdx += 2;
+  return seededShuffle([...faceSlice, ...nonfaceSlice]);
 }
 
 // =============================================================================
@@ -624,7 +622,10 @@ const FlowController = {
     // --- Build global stimulus pools (prevents any image repeating across blocks) ---
     prepareGlobalStimuliPools();
 
-    // --- Pre-build trial sequences ---
+    // --- Draw practice images from pool first (so they never repeat in main blocks) ---
+    STATE.practiceSequence = buildPracticeSequenceFromPool();
+
+    // --- Pre-build trial sequences from remaining pool ---
     STATE.blockSequences = STATE.blockOrder.map((bid) => {
       const bDef = CONFIG.BLOCK_TYPES.find((b) => b.id === bid);
       return buildBlockTrialSequence(bDef);
@@ -711,7 +712,7 @@ const FlowController = {
 
   async runPractice() {
     STATE.isPractice = true;
-    const practiceSeq = buildPracticeSequence();
+    const practiceSeq = STATE.practiceSequence;
     showScreen('screen-trial');
     document.getElementById('trial-progress').textContent = '';
 
