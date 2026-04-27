@@ -600,11 +600,23 @@ const FlowController = {
 
     // --- Task instructions ---
     showScreen('screen-task-instructions');
+
+    // Kick off image loading in the background while the user reads instructions
+    const loadingPromise = loadManifest().then(() => preloadImages(STATE.stimuli));
+
+    const btn = document.getElementById('btn-task-instr-continue');
     await this.waitForBtn('btn-task-instr-continue');
 
-    // --- Load stimuli ---
-    await loadManifest();
-    await preloadImages(STATE.stimuli);
+    // If images aren't ready yet, show a brief loading message on the button
+    if (!STATE.stimuli.length) {
+      btn.textContent = 'Loading images…';
+      btn.disabled = true;
+      await loadingPromise;
+      btn.textContent = 'Start Practice';
+      btn.disabled = false;
+    } else {
+      await loadingPromise;
+    }
 
     // --- Block order (randomized) ---
     STATE.blockOrder = seededShuffle(CONFIG.BLOCK_TYPES.map((b) => b.id));
