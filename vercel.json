@@ -3,7 +3,10 @@
     "api/save-data.js": {
       "memory": 128,
       "maxDuration": 10
+    },
+    "api/admin-data.js": {
+      "memory": 128,
+      "maxDuration": 15
     }
   }
-  }
-
+}

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Face Pareidolia</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .admin-card { max-width: 900px; }
+
+    #filter-input {
+      padding: 0.4rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.9rem;
+      font-family: var(--font);
+      width: 260px;
+    }
+
+    #data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      font-size: 0.93rem;
+    }
+    #data-table th {
+      text-align: left;
+      padding: 0.55rem 0.75rem;
+      border-bottom: 2px solid var(--border);
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+    #data-table td {
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    #data-table tr:last-child td { border-bottom: none; }
+    #data-table tr:hover td { background: #f9f8f6; }
+
+    .pid-cell { font-family: monospace; font-size: 0.88rem; }
+    .date-cell { color: var(--text-muted); font-size: 0.88rem; white-space: nowrap; }
+    .size-cell { color: var(--text-muted); font-size: 0.82rem; }
+
+    .dl-btn {
+      display: inline-block;
+      padding: 0.3rem 0.75rem;
+      border-radius: var(--radius);
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      font-family: var(--font);
+    }
+    .dl-json { background: #e8f4fd; color: #1a5f8a; border: 1px solid #b8d9f0; }
+    .dl-csv  { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
+    .dl-btn:hover { filter: brightness(0.93); }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .session-count { color: var(--text-muted); font-size: 0.9rem; }
+
+    #login-error {
+      color: var(--incorrect);
+      font-size: 0.88rem;
+      margin-top: 0.5rem;
+      display: none;
+    }
+
+    .key-input-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    #admin-key-input {
+      padding: 0.6rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-family: var(--font);
+      flex: 1;
+    }
+
+    .loading { color: var(--text-muted); font-style: italic; }
+  </style>
+</head>
+<body class="ctx-instruction">
+  <div class="screen active">
+    <div class="card wide admin-card">
+      <h2>Data Dashboard</h2>
+      <p>Enter the admin key to view and download participant data.</p>
+
+      <!-- Login -->
+      <div id="login-section">
+        <div class="key-input-row">
+          <input type="password" id="admin-key-input" placeholder="Admin key" autocomplete="current-password" />
+          <button id="btn-load" class="btn btn-primary">Load Data</button>
+        </div>
+        <div id="login-error"></div>
+      </div>
+
+      <!-- Data -->
+      <div id="data-section" style="display:none; margin-top:1.5rem;">
+        <div class="toolbar">
+          <span class="session-count" id="session-count"></span>
+          <input type="text" id="filter-input" placeholder="Filter by participant ID…" />
+        </div>
+        <table id="data-table">
+          <thead>
+            <tr>
+              <th>Participant ID</th>
+              <th>Date &amp; Time (UTC)</th>
+              <th>JSON</th>
+              <th>CSV</th>
+            </tr>
+          </thead>
+          <tbody id="data-tbody"></tbody>
+        </table>
+        <p id="no-results" style="display:none; color:var(--text-muted); margin-top:1rem;">No matching sessions.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allSessions = [];
+
+    function formatDate(iso) {
+      const d = new Date(iso);
+      return d.toISOString().replace('T', ' ').substring(0, 19);
+    }
+
+    function formatSize(bytes) {
+      if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return bytes + ' B';
+    }
+
+    function renderTable(sessions) {
+      const tbody = document.getElementById('data-tbody');
+      const noResults = document.getElementById('no-results');
+      tbody.innerHTML = '';
+
+      if (sessions.length === 0) {
+        noResults.style.display = 'block';
+        return;
+      }
+      noResults.style.display = 'none';
+
+      sessions.forEach(s => {
+        const tr = document.createElement('tr');
+
+        const jsonLink = s.json
+          ? `<a class="dl-btn dl-json" href="${s.json.url}" download target="_blank">
+               JSON <span class="size-cell">(${formatSize(s.json.size)})</span>
+             </a>`
+          : '—';
+
+        const csvLink = s.csv
+          ? `<a class="dl-btn dl-csv" href="${s.csv.url}" download target="_blank">
+               CSV <span class="size-cell">(${formatSize(s.csv.size)})</span>
+             </a>`
+          : '—';
+
+        tr.innerHTML = `
+          <td class="pid-cell">${s.pid}</td>
+          <td class="date-cell">${formatDate(s.uploadedAt)}</td>
+          <td>${jsonLink}</td>
+          <td>${csvLink}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function loadData() {
+      const key = document.getElementById('admin-key-input').value.trim();
+      const errEl = document.getElementById('login-error');
+      const btn = document.getElementById('btn-load');
+
+      if (!key) {
+        errEl.textContent = 'Please enter the admin key.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      btn.textContent = 'Loading…';
+      btn.disabled = true;
+      errEl.style.display = 'none';
+
+      try {
+        const res = await fetch(`/api/admin-data?key=${encodeURIComponent(key)}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          errEl.textContent = data.error || 'Error loading data.';
+          errEl.style.display = 'block';
+          btn.textContent = 'Load Data';
+          btn.disabled = false;
+          return;
+        }
+
+        allSessions = data.sessions;
+        document.getElementById('session-count').textContent =
+          `${allSessions.length} session${allSessions.length !== 1 ? 's' : ''} found`;
+        document.getElementById('data-section').style.display = 'block';
+        renderTable(allSessions);
+
+      } catch (err) {
+        errEl.textContent = 'Network error: ' + err.message;
+        errEl.style.display = 'block';
+      }
+
+      btn.textContent = 'Refresh';
+      btn.disabled = false;
+    }
+
+    document.getElementById('btn-load').addEventListener('click', loadData);
+    document.getElementById('admin-key-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') loadData();
+    });
+
+    document.getElementById('filter-input').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      const filtered = q
+        ? allSessions.filter(s => s.pid.toLowerCase().includes(q))
+        : allSessions;
+      document.getElementById('session-count').textContent =
+        `${filtered.length} of ${allSessions.length} session${allSessions.length !== 1 ? 's' : ''}`;
+      renderTable(filtered);
+    });
+  </script>
+</body>
+</html>
