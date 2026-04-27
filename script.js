@@ -814,21 +814,6 @@ const FlowController = {
       saveStatus.textContent = 'Server save failed. Please use the download buttons below.';
     }
 
-    // Download buttons
-    document.getElementById('btn-download-json').addEventListener('click', () => {
-      downloadFile(
-        `${STATE.participantId}_data.json`,
-        JSON.stringify(exportData, null, 2),
-        'application/json'
-      );
-    });
-    document.getElementById('btn-download-csv').addEventListener('click', () => {
-      downloadFile(
-        `${STATE.participantId}_trials.csv`,
-        trialsToCSV(STATE.trials),
-        'text/csv'
-      );
-    });
   },
 };
 
