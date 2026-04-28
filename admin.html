@@ -110,7 +110,10 @@
       <!-- Data -->
       <div id="data-section" style="display:none; margin-top:1.5rem;">
         <div class="toolbar">
-          <span class="session-count" id="session-count"></span>
+          <div>
+            <span class="session-count" id="session-count"></span>
+            <span id="fetched-at" style="color:var(--text-muted);font-size:0.82rem;margin-left:0.75rem;"></span>
+          </div>
           <input type="text" id="filter-input" placeholder="Filter by participant ID…" />
         </div>
         <table id="data-table">
@@ -194,7 +197,7 @@
       errEl.style.display = 'none';
 
       try {
-        const res = await fetch(`/api/admin-data?key=${encodeURIComponent(key)}`);
+        const res = await fetch(`/api/admin-data?key=${encodeURIComponent(key)}&t=${Date.now()}`);
         const data = await res.json();
 
         if (!res.ok) {
@@ -208,6 +211,8 @@
         allSessions = data.sessions;
         document.getElementById('session-count').textContent =
           `${allSessions.length} session${allSessions.length !== 1 ? 's' : ''} found`;
+        document.getElementById('fetched-at').textContent =
+          `— updated ${formatDate(data.fetchedAt)} UTC`;
         document.getElementById('data-section').style.display = 'block';
         renderTable(allSessions);
 

@@ -40,7 +40,8 @@ export default async function handler(req, res) {
       };
     }).sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
 
-    return res.status(200).json({ sessions });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({ sessions, fetchedAt: new Date().toISOString() });
   } catch (err) {
     console.error('admin-data error:', err);
     return res.status(500).json({ error: err.message });
